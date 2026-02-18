@@ -106,7 +106,7 @@ SOCIAL_ENGINEERING_PATTERNS = [
     (r"(?i)(?:required|must\s+install|prerequisite)[^\n]*(?:first|before)", "Prerequisite instruction (common social engineering vector)", Severity.LOW),
     (r"(?i)install\s+(?:this|the)\s+(?:core|required|essential)\s+(?:dependency|package|module)", "Fake core dependency installation", Severity.HIGH),
     # Urgency/pressure
-    (r"(?i)(?:immediately|right\s+now|as\s+soon\s+as\s+possible|urgent)", "Urgency language (pressure tactic)", Severity.LOW),
+    (r"(?i)(?:you\s+must\s+(?:immediately|urgently|right\s+now)|act\s+(?:immediately|now)\s+or|urgent(?:ly)?:\s+)", "Urgency language targeting user action (pressure tactic)", Severity.LOW),
     # Credential requests
     (r"(?i)(?:enter|provide|paste|input)\s+(?:your\s+)?(?:api\s+key|token|password|secret|credentials)", "Credential request in skill instructions", Severity.HIGH),
     (r"(?i)(?:copy|paste)\s+(?:this|the\s+following)\s+(?:into|in)\s+(?:your\s+)?terminal", "Direct terminal paste instruction", Severity.MEDIUM),
