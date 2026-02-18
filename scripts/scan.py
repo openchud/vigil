@@ -8,6 +8,8 @@ import re
 import sys
 import json
 import argparse
+import tempfile
+import subprocess
 from pathlib import Path
 from dataclasses import dataclass, field, asdict
 from typing import Optional
@@ -176,7 +178,40 @@ def scan_directory(path: Path) -> list[ScanResult]:
     results = []
     for skill_file in path.rglob("SKILL.md"):
         results.append(scan_file(skill_file))
+    # Also scan any .md files in scripts/ directories (skills can have supporting docs)
+    for md_file in path.rglob("*.md"):
+        if md_file.name != "SKILL.md" and "scripts" not in str(md_file):
+            continue
     return results
+
+
+def scan_clawhub(slug: str) -> list[ScanResult]:
+    """Fetch a skill from ClawHub and scan it."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tmppath = Path(tmpdir) / slug
+        try:
+            # Use clawhub CLI if available
+            result = subprocess.run(
+                ["clawhub", "install", slug, "--workdir", tmpdir],
+                capture_output=True, text=True, timeout=30
+            )
+            if result.returncode == 0 and tmppath.exists():
+                return scan_directory(tmppath)
+        except (FileNotFoundError, subprocess.TimeoutExpired):
+            pass
+
+        # Fallback: try to fetch directly from ClawHub API
+        try:
+            import urllib.request
+            api_url = f"https://clawhub.ai/api/skills/{slug}/latest/files/SKILL.md"
+            req = urllib.request.Request(api_url, headers={"Accept": "text/plain"})
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                content = resp.read().decode("utf-8")
+                return [scan_content(content, f"clawhub:{slug}/SKILL.md")]
+        except Exception as e:
+            print(f"Error fetching from ClawHub: {e}")
+            print("Install the clawhub CLI (npm i -g clawhub) for best results.")
+            sys.exit(1)
 
 
 def print_result(result: ScanResult, verbose: bool = False):
@@ -212,6 +247,7 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("path", nargs="?", help="Path to SKILL.md or directory to scan")
+    parser.add_argument("--clawhub", metavar="SLUG", help="Fetch and scan a skill from ClawHub by slug")
     parser.add_argument("--audit", action="store_true", help="Scan all installed OpenClaw skills")
     parser.add_argument("-v", "--verbose", action="store_true", help="Show code snippets")
     parser.add_argument("--json", action="store_true", help="Output JSON")
@@ -221,7 +257,9 @@ def main():
 
     results = []
 
-    if args.audit:
+    if args.clawhub:
+        results = scan_clawhub(args.clawhub)
+    elif args.audit:
         skills_dir = Path("/opt/openclaw/skills")
         if skills_dir.exists():
             results = scan_directory(skills_dir)
